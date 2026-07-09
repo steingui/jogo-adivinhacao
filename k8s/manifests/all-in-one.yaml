@@ -1,0 +1,277 @@
+---
+# Source: guess-game/templates/frontend-nginx-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-nginx-config
+  labels:
+    app: frontend
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+
+        # React frontend static files
+        location / {
+            root /usr/share/nginx/html;
+            index index.html index.htm;
+            try_files $uri $uri/ /index.html;
+        }
+
+        # Proxy API requests to Flask backend replicas
+        location /api/ {
+            proxy_pass http://backend:5000;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Disable caching for API calls
+            add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
+        }
+    }
+---
+# Source: guess-game/templates/db-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-pvc
+  labels:
+    app: db
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: local-path
+---
+# Source: guess-game/templates/backend-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  labels:
+    app: backend
+spec:
+  ports:
+    - port: 5000
+      targetPort: http-backend
+      name: http-backend
+  selector:
+    app: backend
+  type: ClusterIP
+---
+# Source: guess-game/templates/db-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  labels:
+    app: db
+spec:
+  ports:
+    - port: 5432
+      targetPort: postgres
+      name: postgres
+  selector:
+    app: db
+  type: ClusterIP
+---
+# Source: guess-game/templates/frontend-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: http-frontend
+      protocol: TCP
+      name: http-frontend
+      nodePort: 30080
+  selector:
+    app: frontend
+---
+# Source: guess-game/templates/backend-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels:
+    app: backend
+spec:
+  # Replicas managed by HPA if enabled, else defaults to minReplicas or a fixed value.
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: flask-backend
+          image: steingui/jogo-adivinhacao-backend:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_USER
+              value: "guessing_user"
+            - name: POSTGRES_PASSWORD
+              value: "guessing_secure_password_123"
+            - name: POSTGRES_DB
+              value: "guessing_db"
+            - name: POSTGRES_HOST
+              value: "db"
+            - name: POSTGRES_PORT
+              value: "5432"
+          ports:
+            - containerPort: 5000
+              name: http-backend
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http-backend
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http-backend
+            initialDelaySeconds: 10
+            periodSeconds: 5
+---
+# Source: guess-game/templates/db-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  labels:
+    app: db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          env:
+            - name: POSTGRES_USER
+              value: "guessing_user"
+            - name: POSTGRES_PASSWORD
+              value: "guessing_secure_password_123"
+            - name: POSTGRES_DB
+              value: "guessing_db"
+          ports:
+            - containerPort: 5432
+              name: postgres
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - guessing_user
+                - -d
+                - guessing_db
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - guessing_user
+                - -d
+                - guessing_db
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: db-storage
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: db-storage
+          persistentVolumeClaim:
+            claimName: db-pvc
+---
+# Source: guess-game/templates/frontend-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: react-frontend
+          image: steingui/jogo-adivinhacao-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+              name: http-frontend
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http-frontend
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http-frontend
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: frontend-nginx-config
+---
+# Source: guess-game/templates/backend-hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  labels:
+    app: backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50

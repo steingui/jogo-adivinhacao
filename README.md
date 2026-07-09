@@ -134,3 +134,101 @@ Após atualizar as versões, basta aplicar as alterações:
 docker compose up -d
 ```
 O Compose detectará as mudanças de imagem e atualizará apenas os contêineres correspondentes.
+
+---
+
+## ☸️ Orquestração com Kubernetes e Helm
+
+O projeto agora conta com suporte de primeira classe à orquestração com **Kubernetes**, incluindo empacotamento modular via **Helm Charts** e automação de ambiente local via **k3d**.
+
+### 1. Arquitetura no Kubernetes
+
+O diagrama abaixo ilustra a topologia física e lógica de rede, armazenamento e escalabilidade no cluster Kubernetes:
+
+```mermaid
+graph TD
+    subgraph Host ["Máquina Host"]
+        Browser["Navegador do Usuário"] -- "Acesso HTTP (Porta 30080)" --> K3dProxy["k3d LoadBalancer / Proxy (Porta 30080)"]
+    end
+
+    subgraph KubernetesCluster ["Cluster Kubernetes (k3d / K3s)"]
+        subgraph Services ["Serviços de Rede"]
+            SvcFrontend["Service frontend (NodePort: 30080)"]
+            SvcBackend["Service backend (ClusterIP: 5000)"]
+            SvcDB["Service db (ClusterIP: 5432)"]
+        end
+
+        subgraph Workloads ["Cargas de Trabalho"]
+            subgraph FrontendReplicas ["Frontend NGINX & React (Replicas: 2)"]
+                PodFrontend1["Pod frontend-1"]
+                PodFrontend2["Pod frontend-2"]
+            end
+            
+            subgraph BackendReplicas ["Backend Flask (HPA: 2-5 Replicas)"]
+                PodBackend1["Pod backend-1"]
+                PodBackend2["Pod backend-2"]
+                PodBackendScale["Pod backend-N (Scaled)"]
+            end
+
+            subgraph DBWorkload ["Banco de Dados"]
+                PodDB["Pod db (PostgreSQL 15)"]
+            end
+        end
+
+        subgraph Storage ["Armazenamento Persistente"]
+            PVC["PersistentVolumeClaim (db-pvc)"]
+            PV["PersistentVolume (Dynamic local-path)"]
+        end
+
+        subgraph Scaling ["Escalabilidade Dinâmica"]
+            HPA["Horizontal Pod Autoscaler (backend-hpa)"]
+            MS["Metrics Server (kube-system)"]
+        end
+    end
+
+    K3dProxy --> SvcFrontend
+    SvcFrontend --> PodFrontend1 & PodFrontend2
+    
+    PodFrontend1 & PodFrontend2 -- "Proxy API /api/ -> backend:5000" --> SvcBackend
+    SvcBackend --> PodBackend1 & PodBackend2 & PodBackendScale
+    
+    PodBackend1 & PodBackend2 & PodBackendScale -- "Persistência -> db:5432" --> SvcDB
+    SvcDB --> PodDB
+    
+    PodDB --> PVC
+    PVC --> PV
+    
+    MS -- "Coleta de CPU" --> PodBackend1 & PodBackend2 & PodBackendScale
+    HPA -- "Consulta Métricas" --> MS
+    HPA -- "Ajusta Réplicas" --> BackendReplicas
+```
+
+### 2. O que o projeto faz, como faz e por que faz
+
+#### O que faz:
+Gerencia a implantação, escalabilidade automática e resiliência de um sistema distribuído de 3 camadas (Frontend, Backend e Banco de Dados) no Kubernetes, simulando as condições de um ambiente de produção real localmente.
+
+#### Como faz:
+1. **Rede Interna e Resolução de DNS:** Configura um `Service` ClusterIP nomeado `backend` para balancear a carga e mapear o tráfego do frontend via proxy reverso Nginx.
+2. **Escalabilidade Automática (HPA):** Utiliza o `HorizontalPodAutoscaler` e o `metrics-server` para auto-escalar o backend de 2 a 5 réplicas baseando-se no uso de CPU.
+3. **Persistência de Dados:** Provisiona um `PersistentVolumeClaim` utilizando a classe de armazenamento dinâmica `local-path` do K3s para persistir os dados do Postgres.
+4. **Gerenciamento de Pacotes (Helm):** Centraliza as variáveis no `values.yaml` para customizar imagens, réplicas, limites de recursos e portas.
+
+#### Por que faz:
+- **Tolerância a Falhas:** Probes de Liveness/Readiness garantem que pods defeituosos sejam restaurados automaticamente e não recebam tráfego.
+- **Eficiência de Recursos:** O HPA otimiza o uso de hardware, escalando apenas quando necessário sob picos de tráfego.
+- **Simplicidade de Operação (GitOps):** Helm permite empacotar a infraestrutura como código (IaC), permitindo atualizações de versão seguras sem indisponibilidade (RollingUpdate).
+
+### 3. Como Inicializar no Kubernetes
+
+Basta executar o script automatizado na raiz do repositório:
+```bash
+./start_k8s.sh
+```
+
+Acesse o jogo no navegador em: **[http://localhost:30080](http://localhost:30080)**
+
+Para testar o auto-scaling do HPA, execute um gerador de carga:
+```bash
+kubectl run -i --tty load-generator --rm --image=busybox:1.28 --restart=Never -- /bin/sh -c 'while true; do wget -q -O- http://backend:5000/api/health; done'
+```

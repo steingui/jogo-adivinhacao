@@ -1,0 +1,32 @@
+db:
+  image: postgres:15-alpine
+  user: guessing_user
+  password: guessing_secure_password_123
+  database: guessing_db
+  port: 5432
+  storage:
+    size: 1Gi
+    storageClass: local-path
+
+backend:
+  image: steingui/jogo-adivinhacao-backend:latest
+  port: 5000
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 50
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+frontend:
+  image: steingui/jogo-adivinhacao-frontend:latest
+  port: 80
+  replicas: 2
+  serviceType: NodePort
+  nodePort: 30080
