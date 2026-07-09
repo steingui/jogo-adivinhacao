@@ -195,10 +195,7 @@ def create_pdf(filename="Relatorio_Kubernetes_GuessGame.pdf"):
     story = []
 
     # ================= COVER PAGE =================
-    story.append(Spacer(1, 100))
-    story.append(Paragraph("UNIVERSIDADE DO ALUNO", title_style))
-    story.append(Paragraph("Curso de Especialização em Arquitetura de Software & DevOps", subtitle_style))
-    story.append(Spacer(1, 40))
+    story.append(Spacer(1, 150))
     
     # Title Block
     title_box_data = [
@@ -216,13 +213,11 @@ def create_pdf(filename="Relatorio_Kubernetes_GuessGame.pdf"):
         ('TOPPADDING', (0,0), (-1,-1), 25),
     ]))
     story.append(title_box_table)
-    story.append(Spacer(1, 100))
+    story.append(Spacer(1, 120))
     
     # Meta Block
-    story.append(Paragraph("<b>Estudante:</b> Guilherme Steinke", meta_style))
+    story.append(Paragraph("<b>Estudante:</b> Guilherme Stein", meta_style))
     story.append(Paragraph("<b>Disciplina:</b> Orquestração de Containers & Kubernetes", meta_style))
-    story.append(Paragraph("<b>Professor:</b> IEC Professor", meta_style))
-    story.append(Paragraph("<b>Data:</b> Julho de 2026", meta_style))
     story.append(PageBreak())
 
     # ================= PAGE 2: INTRO & DESIGN =================
