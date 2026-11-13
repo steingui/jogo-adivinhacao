@@ -18,4 +18,6 @@ COPY . .
 EXPOSE 5000
 
 # Start with Gunicorn WSGI server
+# Run as an unprivileged user (added by Panoptes)
+USER 10001:10001
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "app:app"]
