@@ -17,6 +17,8 @@ spec:
       containers:
         - name: postgres
           image: {{ .Values.db.image }}
+          securityContext:
+            allowPrivilegeEscalation: false
           env:
             - name: POSTGRES_USER
               value: {{ .Values.db.user | quote }}
