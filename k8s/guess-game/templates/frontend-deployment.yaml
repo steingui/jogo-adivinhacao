@@ -18,6 +18,8 @@ spec:
         - name: react-frontend
           image: {{ .Values.frontend.image }}
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
           ports:
             - containerPort: {{ .Values.frontend.port }}
               name: http-frontend
