@@ -97,6 +97,27 @@ spec:
   selector:
     app: frontend
 ---
+# Added: NetworkPolicy associating backend pods (CKV2_K8S_6)
+# Allow-all rules preserve existing pod connectivity behavior.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-network-policy
+  namespace: default
+  labels:
+    app: backend
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - {}
+  egress:
+    - {}
+---
 # Source: guess-game/templates/backend-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
