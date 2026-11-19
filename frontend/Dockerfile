@@ -24,4 +24,6 @@ EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=3s CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
 
+# Run as an unprivileged user (added by Panoptes)
+USER 10001:10001
 CMD ["nginx", "-g", "daemon off;"]
