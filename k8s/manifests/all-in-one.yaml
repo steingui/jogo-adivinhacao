@@ -173,6 +173,25 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 5
 ---
+# Source: guess-game/templates/db-networkpolicy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-network-policy
+  labels:
+    app: db
+spec:
+  podSelector:
+    matchLabels:
+      app: db
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - {}
+  egress:
+    - {}
+---
 # Source: guess-game/templates/db-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
