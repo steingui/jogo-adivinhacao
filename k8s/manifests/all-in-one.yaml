@@ -282,6 +282,9 @@ spec:
         - name: react-frontend
           image: steingui/jogo-adivinhacao-frontend:latest
           imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 500m
           ports:
             - containerPort: 80
               name: http-frontend
