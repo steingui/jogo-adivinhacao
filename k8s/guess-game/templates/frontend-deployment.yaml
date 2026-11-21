@@ -20,6 +20,7 @@ spec:
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
+            runAsNonRoot: true
           ports:
             - containerPort: {{ .Values.frontend.port }}
               name: http-frontend

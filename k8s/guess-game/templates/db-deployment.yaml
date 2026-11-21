@@ -19,6 +19,8 @@ spec:
           image: {{ .Values.db.image }}
           securityContext:
             allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 999
           env:
             - name: POSTGRES_USER
               value: {{ .Values.db.user | quote }}
