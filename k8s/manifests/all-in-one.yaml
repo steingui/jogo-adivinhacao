@@ -268,6 +268,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend
+  namespace: guess-game
   labels:
     app: frontend
 spec:
@@ -280,13 +281,17 @@ spec:
       labels:
         app: frontend
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: react-frontend
           image: steingui/jogo-adivinhacao-frontend:latest
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
           resources:
             limits:
               cpu: 500m
+              memory: 256Mi
           ports:
             - containerPort: 80
               name: http-frontend
