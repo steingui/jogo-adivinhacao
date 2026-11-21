@@ -208,6 +208,8 @@ spec:
         - name: postgres
           image: postgres:15-alpine
           resources:
+            limits:
+              cpu: 200m
             requests:
               cpu: 100m
           env:
