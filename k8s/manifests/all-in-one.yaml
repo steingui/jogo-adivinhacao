@@ -204,14 +204,31 @@ spec:
       labels:
         app: db
     spec:
+      volumes:
+        - name: pgdata
+          emptyDir: {}
+        - name: pgrun
+          emptyDir: {}
+        - name: pgtmp
+          emptyDir: {}
       containers:
         - name: postgres
           image: postgres:15-alpine
+          securityContext:
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+            - name: pgrun
+              mountPath: /var/run/postgresql
+            - name: pgtmp
+              mountPath: /tmp
           resources:
             limits:
               cpu: 200m
             requests:
               cpu: 100m
+              memory: 128Mi
           env:
             - name: POSTGRES_USER
               value: "guessing_user"
@@ -287,12 +304,11 @@ spec:
           image: steingui/jogo-adivinhacao-frontend:latest@sha256:d69dcdd12350a8ce67f14f19af102dae3abdb65a59970df4aa6c180ff443100d
           imagePullPolicy: IfNotPresent
           securityContext:
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
             capabilities:
               drop:
                 - ALL
-              add:
-                - NET_BIND_SERVICE
           resources:
             limits:
               cpu: 500m
